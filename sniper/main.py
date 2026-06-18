@@ -76,7 +76,7 @@ def main(use_ntp: bool, browsers: list[str] = ["firefox", "thorium"], tokens: li
 
     console.print(f"current system time: {datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")}")
     console.print(f"current offset time: {offset.time.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")}")
-    diff = datetime.now(UTC) - offset.time.astimezone(UTC)
+    diff = abs((datetime.now(UTC) - offset.time.astimezone(UTC)).total_seconds())
     console.print(f"difference: {diff}")
 
     client = Client(tokens[0])
@@ -99,11 +99,11 @@ def main(use_ntp: bool, browsers: list[str] = ["firefox", "thorium"], tokens: li
         -0.1, 0,
     ]
 
-    if abs(max(first_offset, probed_offset) - min(first_offset, probed_offset)) > 0.05:
+    if abs(first_offset - probed_offset) > 0.05:
         offsets.append(first_offset)
         offsets.append(probed_offset)
     else:
-        offsets.append(first_offset)
+        offsets.append(min(first_offset, probed_offset))
 
     workers: list[Thread] = []
     for n, delta in enumerate(offsets):
