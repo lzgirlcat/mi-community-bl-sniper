@@ -1,6 +1,5 @@
 from string import ascii_lowercase
 
-from rich.console import Console
 from ntplib import NTPClient
 from pytz import timezone
 from datetime import datetime, timedelta
@@ -9,7 +8,7 @@ from sniper.api import Client
 from threading import Thread
 from random import choice
 
-from .utils import get_cookies, TimeOffsetManager
+from .utils import get_cookies, TimeOffsetManager, ConsoleWithPrefix
 
 CN_NTP_SERVERS = [
     "ntp.tencent.com",  # Tencent Cloud
@@ -30,10 +29,10 @@ FIRE_AT = {
 
 
 def main(use_ntp: bool, browsers: list[str] = ["firefox", "thorium"], tokens: list[str] = []):
-    console = Console()
+    console = ConsoleWithPrefix()
 
     for browser in browsers:
-        console.print(f"[green]loading tokens for[/green]:[underline] {browser}[/underline]")
+        console.print(f"[blue]loading tokens for[/blue]:[underline] {browser}[/underline]")
 
         cookies = get_cookies(browser)
         if cookies and (token:=cookies.get("new_bbs_serviceToken")):
@@ -44,7 +43,7 @@ def main(use_ntp: bool, browsers: list[str] = ["firefox", "thorium"], tokens: li
         console.print("[red bold]failed to load any tokens, exiting...")
         return
 
-    console.print(f"tokens: {tokens}")
+    console.print(f"tokens: {[i[:10] + "..." for i in tokens]}")
 
     if use_ntp:
         console.print(f"[yellow]updating NTP time...[/yellow]")
@@ -81,9 +80,11 @@ def main(use_ntp: bool, browsers: list[str] = ["firefox", "thorium"], tokens: li
 
     client = Client(tokens[0])
     status = client.check_status()
-    first_offset, http_offset, probed_offset = client.measure_offsets()
 
-    if status["is_pass"] == 1:
+    if status["code"] == 100004:
+        console.print("[red bold]invalid auth, please relogin in your browser!, exiting...[/red bold]")
+        return
+    elif status["is_pass"] == 1:
         console.print("[green bold]unlock request already granted, exiting...")
         return
     elif status["button_state"] == 2:
@@ -94,6 +95,9 @@ def main(use_ntp: bool, browsers: list[str] = ["firefox", "thorium"], tokens: li
         return
     elif status["button_state"] == 1:
         console.print("[blue bold]unlock request possible, continuing...")
+
+    console.print("[blue]measuring delay to mi community...[/blue]")
+    first_offset, http_offset, probed_offset = client.measure_offsets()
 
     offsets = [
         -0.1, 0,
@@ -128,7 +132,7 @@ def main(use_ntp: bool, browsers: list[str] = ["firefox", "thorium"], tokens: li
 
 
 def worker(
-    console: Console,
+    console: ConsoleWithPrefix,
     id: str,
     token: str,
     beijing_time: datetime,
@@ -139,31 +143,31 @@ def worker(
     target = (beijing_time + timedelta(days=TD_DAYS)).replace(
         **{"hour":0, "minute":0, "second":0, "microsecond":0, **FIRE_AT} # type: ignore
     ) - timedelta(seconds=fire_delta)
-    console.print(f"[yellow underline bold]{id}[/yellow underline bold] firing at {target.strftime("%Y-%m-%d %H:%M:%S.%f")}")
+    console.printw(id, f"firing at {target.strftime("%Y-%m-%d %H:%M:%S.%f")}")
     while True:
         if (diff := (target - offset.time).total_seconds()) > 5:
             sleep(min(3, diff - 1))
         elif diff < 0:
-            console.print(f"[yellow underline bold]{id}[/yellow underline bold]: -{fire_delta} firing !!!")
+            console.printw(id, f"-{fire_delta} firing !!!")
             res = client.try_apply()
-            console.print(f"[yellow underline bold]{id}[/yellow underline bold]: {res}")
+            console.printw(id, f"{res}")
             if res["code"] == 0:
                 if res["apply_result"] == 1:
-                    console.print(f"[yellow underline bold]{id}[/yellow underline bold]: [green bold]success!!!!!![/green bold]")
-                if res["apply_result"] == 6:
-                    console.print(f"[yellow underline bold]{id}[/yellow underline bold]: [green bold]the request might've succeeded, please check MI Unlock[/green bold]")
+                    console.printw(id, f"[green bold]success!!!!!![/green bold]")
+                if res["apply_result"] in (5, 6):
+                    console.printw(id, f"[green bold]the request might've succeeded, please check MI Unlock[/green bold]")
                 elif res["apply_result"] == 3:
-                    console.print(f"[yellow underline bold]{id}[/yellow underline bold]: [red bold]limit reached:<[/red bold]")
-                    console.print(f"[yellow underline bold]{id}[/yellow underline bold]: try again later at {res["deadline_format"]}")
+                    console.printw(id, f"[red bold]limit reached:<[/red bold]")
+                    console.printw(id, f"try again later at {res["deadline_format"]}")
                 elif res["apply_result"] == 4:
-                    console.print(f"[yellow underline bold]{id}[/yellow underline bold]: [red bold]ratelimited until {res["deadline_format"]}[/red bold]")
+                    console.printw(id, f"[red bold]ratelimited until {res["deadline_format"]}[/red bold]")
             elif res["code"] == 100001:
-                console.print(f"[yellow underline bold]{id}[/yellow underline bold]: [red bold]request was rejected !?![/red bold]")
+                console.printw(id, f"[red bold]request was rejected !?![/red bold]")
             elif res["code"] == 100003:
-                console.print(f"[yellow underline bold]{id}[/yellow underline bold]: [blue bold]unknown!?! checking status...[/blue bold]")
+                console.printw(id, f"[blue bold]unknown!?! checking status...[/blue bold]")
                 status = client.check_status()
                 if status["is_pass"] == 1:
-                    console.print(f"[yellow underline bold]{id}[/yellow underline bold]: [green bold]success!!!!!![/green bold]")
+                    console.printw(id, f"[green bold]success!!!!!![/green bold]")
             break
         else:
             sleep(0.0001)

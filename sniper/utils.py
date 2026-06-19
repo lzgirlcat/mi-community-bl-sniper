@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from time import monotonic
 from yt_dlp.cookies import extract_cookies_from_browser, YoutubeDLCookieJar
-
+from rich.console import Console
 
 class TimeOffsetManager:
     def __init__(self, start_dt: datetime) -> None:
@@ -27,3 +27,8 @@ def get_cookies(browser: str = "firefox", profile: str | None = None):
         if (cookie.domain == "mi.com" or cookie.domain.endswith(".mi.com"))
         and cookie.value
     }
+
+
+class ConsoleWithPrefix(Console):
+    def printw(self, worker, *args, **kwargs):
+        self.print(f"[yellow underline bold]{worker}[/yellow underline bold]:", *args, **kwargs)

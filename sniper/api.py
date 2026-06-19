@@ -89,7 +89,7 @@ class Client:
         )
         res.raise_for_status()
         resp = res.json()
-        return {**resp["data"], "code": resp["code"], "ts": resp.get("ts")}  # type: ignore
+        return {**(resp.get("data") or {}), "code": resp["code"], "ts": resp.get("ts")}  # type: ignore
 
     def try_apply(self) -> ApplyResponse:
         res = self.session.post(
@@ -99,7 +99,7 @@ class Client:
         )
         res.raise_for_status()
         resp = res.json()
-        return {**resp["data"], "code": resp["code"], "ts": resp.get("ts")}  # type: ignore
+        return {**(resp.get("data") or {}), "code": resp["code"], "ts": resp.get("ts")}  # type: ignore
 
     def measure_offsets(self, probes=3) -> tuple[float, float, float]:
         start = perf_counter()
